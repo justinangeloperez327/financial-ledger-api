@@ -28,7 +28,7 @@ To use local Go and a local PostgreSQL database:
 ```bash
 cp .env.example .env
 # Export variables from .env using your preferred shell.
-go mod tidy
+go mod download
 go run ./cmd/api
 ```
 
@@ -67,7 +67,7 @@ make migrate-up     # Apply migrations (requires goose and DATABASE_URL)
 make migrate-down   # Roll back most recent migration
 ```
 
-The initial scaffold does not include a committed `go.sum` because external module download was unavailable in the initialization environment. Run `go mod tidy` from a network-connected development environment before treating dependency resolution as locked; commit the generated `go.sum` in the next change.
+Dependencies are pinned in `go.mod` and verified by `go.sum`. CI checks that `go mod tidy` does not change either manifest.
 
 ## Accounting invariants (planned)
 
