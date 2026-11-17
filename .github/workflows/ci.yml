@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Resolve Go modules
+        run: go mod tidy
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: Static analysis
+        run: go vet ./...
+      - name: Unit and race tests
+        run: go test -race ./...
+      - name: Build API
+        run: go build ./cmd/api

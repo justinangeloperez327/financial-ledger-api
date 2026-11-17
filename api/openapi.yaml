@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: Financial Ledger API
+  version: 0.1.0
+  description: |
+    Foundation-only contract. Financial journal and transfer endpoints
+    will be specified after the domain model and invariants are finalized.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      tags: [Operations]
+      summary: Check API process liveness
+      operationId: getHealth
+      responses:
+        "200":
+          description: API process is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /readyz:
+    get:
+      tags: [Operations]
+      summary: Check PostgreSQL connectivity
+      operationId: getReadiness
+      responses:
+        "200":
+          description: PostgreSQL connection is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: PostgreSQL is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnavailableStatus"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+    UnavailableStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: unavailable

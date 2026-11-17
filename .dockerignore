@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+bin
+coverage.*
+*.test
+*.out
