@@ -3,6 +3,7 @@ package config
 import "testing"
 
 func TestLoad(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-only-secret-at-least-32-bytes-long")
 	t.Setenv("DATABASE_URL", "postgres://example:example@localhost:5432/example")
 	t.Setenv("APP_PORT", "")
 	cfg, err := Load()
@@ -30,5 +31,14 @@ func TestLoadRejectsInvalidPort(t *testing.T) {
 				t.Fatalf("expected error for APP_PORT=%s", port)
 			}
 		})
+	}
+}
+
+func TestLoadRejectsMissingSecret(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/ledger")
+	t.Setenv("APP_PORT", "8080")
+	t.Setenv("JWT_SECRET", "short")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected secret validation")
 	}
 }

@@ -1,32 +1,51 @@
 name: CI
-
 on:
   push:
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ledger_test
+          POSTGRES_USER: ledger_test
+          POSTGRES_PASSWORD: test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledger_test -d ledger_test"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://ledger_test:test_only@localhost:5432/ledger_test?sslmode=disable
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
-          cache: false
+          go-version: '1.27.4'
+          cache: true
       - name: Verify dependency manifests
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
       - name: Check formatting
-        run: test -z "$(gofmt -l cmd internal)"
+        run: test -z "$(gofmt -l cmd internal db tests)"
+      - name: Verify generated SQL
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+          sqlc generate
+          git diff --exit-code -- internal/platform/database/queries
       - name: Static analysis
         run: go vet ./...
-      - name: Unit and race tests
-        run: go test -race ./...
-      - name: Build API
-        run: go build -o /tmp/financial-ledger-api ./cmd/api
+      - name: Unit, PostgreSQL integration and race tests
+        run: go test -race -count=1 -cover ./...
+      - name: Build commands
+        run: |
+          CGO_ENABLED=0 go build -trimpath -o /tmp/api ./cmd/api
+          CGO_ENABLED=0 go build -trimpath -o /tmp/migrate ./cmd/migrate
+          CGO_ENABLED=0 go build -trimpath -o /tmp/token ./cmd/token
+      - name: Verify container build
+        run: docker build -t financial-ledger-api:ci .

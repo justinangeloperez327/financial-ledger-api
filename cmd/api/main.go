@@ -13,8 +13,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/justinangeloperez327/financial-ledger-api/internal/auth"
 	"github.com/justinangeloperez327/financial-ledger-api/internal/config"
 	"github.com/justinangeloperez327/financial-ledger-api/internal/httpapi"
+	"github.com/justinangeloperez327/financial-ledger-api/internal/ledger"
 )
 
 func main() {
@@ -46,11 +48,12 @@ func run(logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(pool),
+		Handler:           httpapi.NewRouter(pool, httpapi.API{Store: &ledger.Store{DB: pool}, Verifier: auth.Verifier{Secret: []byte(cfg.JWTSecret), Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience}}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    32 * 1024,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

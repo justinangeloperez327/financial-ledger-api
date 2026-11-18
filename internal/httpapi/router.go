@@ -15,7 +15,7 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-func NewRouter(db Pinger) http.Handler {
+func NewRouter(db Pinger, api ...API) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
@@ -38,6 +38,9 @@ func NewRouter(db Pinger) http.Handler {
 		writeStatus(w, http.StatusOK, "ok")
 	})
 
+	if len(api) > 0 {
+		api[0].Routes(r)
+	}
 	return r
 }
 

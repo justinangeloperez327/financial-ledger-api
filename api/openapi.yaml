@@ -1,58 +1,1392 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: Financial Ledger API
-  version: 0.1.0
-  description: |
-    Foundation-only contract. Financial journal and transfer endpoints
-    will be specified after the domain model and invariants are finalized.
+  version: 1.0.0
+  description: General ledger portfolio MVP. Exact string minor units; immutable,
+    atomic postings; ledger-scoped HS256 access tokens. Server-assigned timestamps;
+    no FX or backdating. See README and docs/operations.md for token issuance and
+    role permissions.
 servers:
-  - url: http://localhost:8080
+- url: http://localhost:8080
+security:
+- bearerAuth: []
 paths:
   /healthz:
     get:
-      tags: [Operations]
-      summary: Check API process liveness
-      operationId: getHealth
+      summary: Process liveness
+      operationId: get__healthz
       responses:
-        "200":
-          description: API process is running
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                $ref: '#/components/schemas/Status'
+      security: []
   /readyz:
     get:
-      tags: [Operations]
-      summary: Check PostgreSQL connectivity
-      operationId: getReadiness
+      summary: PostgreSQL connectivity
+      operationId: get__readyz
       responses:
-        "200":
-          description: PostgreSQL connection is healthy
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
-        "503":
-          description: PostgreSQL is unavailable
+                $ref: '#/components/schemas/Status'
+        '503':
+          description: Unavailable
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnavailableStatus"
+                $ref: '#/components/schemas/Status'
+      security: []
+  /v1/currencies:
+    get:
+      summary: List currency metadata
+      operationId: get__v1_currencies
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencyList'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: Any valid token.
+  /v1/ledgers:
+    post:
+      summary: Create a ledger
+      operationId: post__v1_ledgers
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ledger'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      description: 'Global operator (admin: true) only.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LedgerCreate'
+  /v1/ledgers/{ledgerID}:
+    get:
+      summary: Get ledger metadata
+      operationId: get__v1_ledgers_ledgerID
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ledger'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      description: Reader, writer, ledger admin, or global operator.
+  /v1/ledgers/{ledgerID}/accounts:
+    get:
+      summary: List accounts
+      operationId: get__v1_ledgers_ledgerID_accounts
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+    post:
+      summary: Create an account
+      operationId: post__v1_ledgers_ledgerID_accounts
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      description: Writer or admin. Code is unique within a ledger. Account identity
+        and policy are immutable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreate'
+  /v1/ledgers/{ledgerID}/accounts/{accountID}/close:
+    post:
+      summary: Close an account
+      operationId: post__v1_ledgers_ledgerID_accounts_accountID_close
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/AccountID'
+      description: Ledger admin or global operator. Closed accounts reject all future
+        postings, including reversals. Reports remain accessible. Repeated closure
+        returns 404.
+  /v1/ledgers/{ledgerID}/accounts/{accountID}/balance:
+    get:
+      summary: Get account balance
+      operationId: get__v1_ledgers_ledgerID_accounts_accountID_balance
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/AccountID'
+  /v1/ledgers/{ledgerID}/accounts/{accountID}/statement:
+    get:
+      summary: Get account journal lines
+      operationId: get__v1_ledgers_ledgerID_accounts_accountID_statement
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statement'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/AccountID'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+  /v1/ledgers/{ledgerID}/journals:
+    get:
+      summary: List journal headers
+      operationId: get__v1_ledgers_ledgerID_journals
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalList'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+    post:
+      summary: Post a balanced journal
+      operationId: post__v1_ledgers_ledgerID_journals
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+        '200':
+          description: Idempotent replay of the original journal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+          headers:
+            Idempotency-Replayed:
+              schema:
+                type: string
+                enum:
+                - 'true'
+              description: Present for matching retries
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      description: Writer or admin. Every account must be open and belong to this
+        ledger and currency. Posting, key, and audit commit atomically.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Posting'
+  /v1/ledgers/{ledgerID}/journals/{journalID}:
+    get:
+      summary: Get a journal with lines
+      operationId: get__v1_ledgers_ledgerID_journals_journalID
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/JournalID'
+  /v1/ledgers/{ledgerID}/journals/{journalID}/reverse:
+    post:
+      summary: Reverse a journal exactly once
+      operationId: post__v1_ledgers_ledgerID_journals_journalID_reverse
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+        '200':
+          description: Idempotent replay of the original journal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+          headers:
+            Idempotency-Replayed:
+              schema:
+                type: string
+                enum:
+                - 'true'
+              description: Present for matching retries
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/JournalID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      description: Writer or admin. Derives opposite lines from the original. Reversal-of-reversal,
+        closed accounts, and negative-balance violations return 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reversal'
+  /v1/ledgers/{ledgerID}/transfers:
+    post:
+      summary: Transfer between same-currency asset accounts
+      operationId: post__v1_ledgers_ledgerID_transfers
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+        '200':
+          description: Idempotent replay of the original journal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+          headers:
+            Idempotency-Replayed:
+              schema:
+                type: string
+                enum:
+                - 'true'
+              description: Present for matching retries
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      description: Writer or admin. Credits the source asset and debits the destination
+        asset through the posting engine. FX is unsupported.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transfer'
+  /v1/ledgers/{ledgerID}/trial-balance:
+    get:
+      summary: Get per-account trial balance
+      operationId: get__v1_ledgers_ledgerID_trial_balance
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrialBalance'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      description: All accounts, sorted by currency and code. Compare debit/credit
+        totals within each currency; currencies are never combined.
+  /v1/ledgers/{ledgerID}/audit-events:
+    get:
+      summary: List immutable audit events
+      operationId: get__v1_ledgers_ledgerID_audit_events
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditList'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient role or ledger scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Scoped resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: State conflict, key mismatch, or lock contention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - $ref: '#/components/parameters/LedgerID'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      description: Ledger admin or global operator only.
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: HS256 with verified sub, iss, aud, iat, exp and nbf. Maximum lifetime
+        one hour. ledgers maps UUIDs to reader/writer/admin; admin=true is global
+        operator.
+  parameters:
+    LedgerID:
+      name: ledgerID
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+        pattern: ^[0-9a-f-]{36}$
+    AccountID:
+      name: accountID
+      in: path
+      required: true
+      schema: *id001
+    JournalID:
+      name: journalID
+      in: path
+      required: true
+      schema: *id001
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: Durable ledger-scoped key. Reuse only for the same typed payload
+        and operation. Line ordering is significant.
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 1000000
+        default: 0
   schemas:
-    HealthStatus:
+    Error:
       type: object
-      additionalProperties: false
-      required: [status]
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+              - unauthorized
+              - forbidden
+              - invalid_request
+              - not_found
+              - conflict
+              - unavailable
+              - internal_error
+            request_id:
+              type: string
+          required:
+          - code
+          - request_id
+      required:
+      - error
+    Status:
+      type: object
       properties:
         status:
           type: string
-          const: ok
-    UnavailableStatus:
+      required:
+      - status
+    LedgerCreate:
       type: object
-      additionalProperties: false
-      required: [status]
       properties:
-        status:
+        name:
           type: string
-          const: unavailable
+          minLength: 1
+          maxLength: 120
+      additionalProperties: false
+      required:
+      - name
+    Ledger:
+      type: object
+      properties:
+        id: *id001
+        name:
+          type: string
+        created_at: &id004
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - created_at
+    AccountCreate:
+      type: object
+      properties:
+        code: &id005
+          type: string
+          minLength: 1
+          maxLength: 40
+        name: &id006
+          type: string
+          minLength: 1
+          maxLength: 120
+        kind: &id007
+          type: string
+          enum:
+          - asset
+          - liability
+          - equity
+          - income
+          - expense
+        currency: &id002
+          type: string
+          enum:
+          - AED
+          - PHP
+          - USD
+        allow_negative:
+          type: boolean
+          default: true
+      additionalProperties: false
+      required:
+      - code
+      - name
+      - kind
+      - currency
+    Line:
+      type: object
+      properties:
+        account_id: *id001
+        side:
+          type: string
+          enum:
+          - debit
+          - credit
+        amount: &id003
+          type: string
+          pattern: ^[1-9][0-9]*$
+          maxLength: 19
+          description: Positive minor-unit integer, at most 9223372036854775807. AED
+            100.00 is "10000".
+          example: '10000'
+      additionalProperties: false
+      required:
+      - account_id
+      - side
+      - amount
+    Posting:
+      type: object
+      properties:
+        currency: *id002
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 2
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Line'
+          description: Unique account IDs; total debits equal total credits within
+            int64 limits.
+      additionalProperties: false
+      required:
+      - currency
+      - description
+      - lines
+    Transfer:
+      type: object
+      properties:
+        from_account_id: *id001
+        to_account_id: *id001
+        currency: *id002
+        amount: *id003
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+      additionalProperties: false
+      required:
+      - from_account_id
+      - to_account_id
+      - currency
+      - amount
+      - description
+    Reversal:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+      additionalProperties: false
+      required:
+      - description
+    Journal:
+      type: object
+      properties:
+        id: *id001
+        ledger_id: *id001
+        currency: *id002
+        description:
+          type: string
+        reversal_of:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f-]{36}$
+          nullable: true
+        actor:
+          type: string
+        created_at: *id004
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/Line'
+          nullable: true
+          description: Populated by detail and posting endpoints. Null in paginated
+            journal header lists.
+      required:
+      - id
+      - ledger_id
+      - currency
+      - description
+      - reversal_of
+      - actor
+      - created_at
+      - lines
+    Balance:
+      type: object
+      properties:
+        account_id: *id001
+        code:
+          type: string
+        kind:
+          type: string
+          enum:
+          - asset
+          - liability
+          - equity
+          - income
+          - expense
+        currency: *id002
+        debits:
+          type: string
+          pattern: ^[0-9]+$
+        credits:
+          type: string
+          pattern: ^[0-9]+$
+        balance:
+          type: string
+          pattern: ^-?[0-9]+$
+          description: 'Natural balance: debit minus credit for assets/expenses; credit
+            minus debit otherwise. Arbitrary precision minor units.'
+      required:
+      - account_id
+      - code
+      - kind
+      - currency
+      - debits
+      - credits
+      - balance
+    StatementLine:
+      type: object
+      properties:
+        journal_id: *id001
+        description:
+          type: string
+        created_at: *id004
+        side:
+          type: string
+          enum:
+          - debit
+          - credit
+        amount: *id003
+      required:
+      - journal_id
+      - description
+      - created_at
+      - side
+      - amount
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        actor:
+          type: string
+        action:
+          type: string
+        resource_id: *id001
+        created_at: *id004
+      required:
+      - id
+      - actor
+      - action
+      - resource_id
+      - created_at
+    Currency:
+      type: object
+      properties:
+        code: *id002
+        minor_units:
+          type: integer
+          minimum: 0
+          maximum: 4
+      required:
+      - code
+      - minor_units
+    Account:
+      type: object
+      properties:
+        code: *id005
+        name: *id006
+        kind: *id007
+        currency: *id002
+        allow_negative:
+          type: boolean
+        id: *id001
+        ledger_id: *id001
+        closed:
+          type: boolean
+        created_at: *id004
+      required:
+      - code
+      - name
+      - kind
+      - currency
+      - allow_negative
+      - id
+      - ledger_id
+      - closed
+      - created_at
+    AccountList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+      - data
+      - limit
+      - offset
+    JournalList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Journal'
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+      - data
+      - limit
+      - offset
+    Statement:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementLine'
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+      - data
+      - limit
+      - offset
+    AuditList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+      - data
+      - limit
+      - offset
+    TrialBalance:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Balance'
+      required:
+      - data
+    CurrencyList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Currency'
+      required:
+      - data

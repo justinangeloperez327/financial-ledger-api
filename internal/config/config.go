@@ -12,6 +12,9 @@ import (
 type Config struct {
 	Port        string
 	DatabaseURL string
+	JWTSecret   string
+	JWTIssuer   string
+	JWTAudience string
 }
 
 func Load() (Config, error) {
@@ -29,5 +32,17 @@ func Load() (Config, error) {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
 
-	return Config{Port: port, DatabaseURL: databaseURL}, nil
+	secret := os.Getenv("JWT_SECRET")
+	if len(secret) < 32 {
+		return Config{}, errors.New("JWT_SECRET must contain at least 32 bytes")
+	}
+	issuer := strings.TrimSpace(os.Getenv("JWT_ISSUER"))
+	if issuer == "" {
+		issuer = "financial-ledger-api"
+	}
+	audience := strings.TrimSpace(os.Getenv("JWT_AUDIENCE"))
+	if audience == "" {
+		audience = "financial-ledger-api"
+	}
+	return Config{Port: port, DatabaseURL: databaseURL, JWTSecret: secret, JWTIssuer: issuer, JWTAudience: audience}, nil
 }

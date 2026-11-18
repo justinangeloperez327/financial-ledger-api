@@ -15,16 +15,30 @@ services:
       timeout: 3s
       retries: 12
 
+  migrate:
+    build: .
+    entrypoint: ["/migrate"]
+    environment:
+      DATABASE_URL: "postgres://ledger_dev:local_only@postgres:5432/ledger?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: .
     environment:
       APP_PORT: "8080"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 random bytes)}"
+      JWT_ISSUER: "financial-ledger-api"
+      JWT_AUDIENCE: "financial-ledger-api"
       DATABASE_URL: "postgres://ledger_dev:local_only@postgres:5432/ledger?sslmode=disable"
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
