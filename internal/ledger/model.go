@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var (
@@ -60,8 +61,11 @@ func ValidID(s string) bool {
 	}
 	return true
 }
+
+// Text limits user-facing text by Unicode code points, matching PostgreSQL
+// length(text) and OpenAPI maxLength. Opaque keys retain their own byte limit.
 func Text(s string, max int) bool {
-	return strings.TrimSpace(s) != "" && len(s) <= max && !strings.ContainsRune(s, 0)
+	return utf8.ValidString(s) && strings.TrimSpace(s) != "" && utf8.RuneCountInString(s) <= max && !strings.ContainsRune(s, 0)
 }
 
 type Ledger struct {

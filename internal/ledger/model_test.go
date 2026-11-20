@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +52,27 @@ func TestIDs(t *testing.T) {
 		if ValidID(id) {
 			t.Fatal(id)
 		}
+	}
+}
+
+func TestTextCharacterLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		max        int
+		valid      bool
+	}{
+		{"Arabic boundary", strings.Repeat("ع", 120), 120, true},
+		{"Arabic over boundary", strings.Repeat("ع", 121), 120, false},
+		{"Emoji boundary", strings.Repeat("😀", 120), 120, true},
+		{"ASCII boundary", strings.Repeat("a", 120), 120, true},
+		{"Whitespace", " \t\n", 120, false},
+		{"NUL", "name\x00", 120, false},
+		{"Invalid UTF8", string([]byte{0xff}), 120, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Text(tc.text, tc.max); got != tc.valid {
+				t.Fatalf("Text()=%v, want %v", got, tc.valid)
+			}
+		})
 	}
 }

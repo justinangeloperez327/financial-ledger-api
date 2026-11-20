@@ -386,7 +386,8 @@ paths:
       parameters:
       - $ref: '#/components/parameters/LedgerID'
       - $ref: '#/components/parameters/AccountID'
-      description: Ledger admin or global operator. Closed accounts reject all future
+      description: Ledger admin or global operator. Closure requires an exact zero
+        net balance; a nonzero balance returns 409. Closed accounts reject all future
         postings, including reversals. Reports remain accessible. Repeated closure
         returns 404.
   /v1/ledgers/{ledgerID}/accounts/{accountID}/balance:

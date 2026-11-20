@@ -108,7 +108,9 @@ A journal needs 2–100 lines, unique accounts, matching currencies and ledgers,
 
 Every posting, transfer, and reversal requires `Idempotency-Key` (1–128 bytes). A first success returns 201; a matching retry returns the original journal with 200 and `Idempotency-Replayed: true`. Reusing the key with a changed operation or payload returns 409. Keys are scoped to the ledger and retained indefinitely. JSON object field order is normalized; line array order is part of the fingerprint. Failed transactions do not consume keys. Ledger/account creation uses unique account codes where applicable, rather than posting idempotency.
 
-Asset and expense balances are debits minus credits; liability, equity, and income balances are credits minus debits. `allow_negative` defaults to true for general ledger flexibility; set it to false when creating cash or bank accounts that cannot overdraw. Transfers require two open asset accounts. Closed accounts remain reportable but reject new postings, including reversals. Reverse a transfer before closing its accounts. A journal can be reversed once, and a reversal cannot itself be reversed.
+Asset and expense balances are debits minus credits; liability, equity, and income balances are credits minus debits. `allow_negative` defaults to true for general ledger flexibility; set it to false when creating cash or bank accounts that cannot overdraw. Transfers require two open asset accounts. Account closure requires an exact zero net balance; attempts to close a funded or overdrawn account return 409. Drain or correct the balance before closure. Closed accounts remain reportable but reject new postings, including reversals. A journal can be reversed once, and a reversal cannot itself be reversed.
+
+Names, account codes, and descriptions use Unicode character limits matching the API contract and PostgreSQL. Idempotency keys retain their explicit 128-byte limit.
 
 List endpoints use `limit` (default 50, maximum 200) and `offset` (default 0). Trial balance returns all accounts for a ledger to preserve a complete report; it does not combine currencies. Journal lists contain headers; the detail endpoint supplies lines. Reports include committed history at query time; statements have no editable dates or backdating.
 
@@ -124,7 +126,7 @@ export TEST_DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/ledger_test?ss
 make integration
 ```
 
-Integration tests exercise real PostgreSQL constraints, concurrent retries, competing withdrawals, opposing transfers, transaction fault injection, and HTTP workflows. Without `TEST_DATABASE_URL`, integration tests explicitly skip. CI supplies PostgreSQL and runs all tests with the race detector, generated-query checks, and container build.
+Integration tests exercise real PostgreSQL constraints, constraint-timing changes, closure/posting races, Unicode round trips, concurrent retries, competing withdrawals, opposing transfers, transaction fault injection, and HTTP workflows. Migration upgrade and rollback tests preserve existing financial history. Without `TEST_DATABASE_URL`, integration tests explicitly skip. CI supplies PostgreSQL and runs all tests with the race detector, generated-query checks, and container build.
 
 `make sqlc` regenerates reference queries with sqlc **v1.30.0**. Lock-sensitive financial operations use explicit pgx transactions. `make migrate-up` runs the embedded Goose migrations. Rollback is an operator action using Goose CLI (`make migrate-down`); migration 2 rollback deletes ledger data and must only be used with disposable databases.
 

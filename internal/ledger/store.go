@@ -106,22 +106,38 @@ func (s *Store) Accounts(ctx context.Context, lid string, limit, offset int) ([]
 	return out, rows.Err()
 }
 func (s *Store) CloseAccount(ctx context.Context, lid, id, actor string) error {
-	tx, err := s.DB.Begin(ctx)
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	tag, err := tx.Exec(ctx, "UPDATE accounts SET closed=true WHERE ledger_id=$1 AND id=$2 AND NOT closed", lid, id)
-	if err == nil && tag.RowsAffected() == 0 {
+	if _, err = tx.Exec(ctx, "SET LOCAL lock_timeout='5s'"); err != nil {
+		return err
+	}
+	// Share the posting engine's account lock. The following statement gets a
+	// fresh READ COMMITTED snapshot after any competing posting has committed.
+	account, err := scanAccount(tx.QueryRow(ctx, "SELECT "+accountCols+" FROM accounts WHERE ledger_id=$1 AND id=$2 FOR UPDATE", lid, id))
+	if err != nil {
+		return dbError(err)
+	}
+	if account.Closed {
 		return ErrNotFound
 	}
-	if err == nil {
-		err = audit(ctx, tx, lid, actor, "account.closed", id)
+	var zero bool
+	err = tx.QueryRow(ctx, "SELECT coalesce(sum(CASE WHEN side='debit' THEN amount::numeric ELSE -amount::numeric END),0)=0 FROM journal_lines WHERE account_id=$1", id).Scan(&zero)
+	if err != nil {
+		return dbError(err)
 	}
-	if err == nil {
-		err = tx.Commit(ctx)
+	if !zero {
+		return ErrConflict
 	}
-	return dbError(err)
+	if _, err = tx.Exec(ctx, "UPDATE accounts SET closed=true WHERE id=$1", id); err != nil {
+		return dbError(err)
+	}
+	if err = audit(ctx, tx, lid, actor, "account.closed", id); err != nil {
+		return dbError(err)
+	}
+	return dbError(tx.Commit(ctx))
 }
 
 const journalCols = "id::text,ledger_id::text,currency,description,reversal_of::text,actor,created_at"
@@ -174,7 +190,7 @@ func (s *Store) Journals(ctx context.Context, lid string, limit, offset int) ([]
 
 // Post serializes retries before locking accounts. The key, audit and posting share one commit.
 func (s *Store) Post(ctx context.Context, lid, key, actor, operation string, p Posting, reversal string) (Journal, bool, error) {
-	if !Text(key, 128) {
+	if len(key) > 128 || !Text(key, 128) {
 		return Journal{}, false, ErrInvalid
 	}
 	canonical, err := json.Marshal(struct {

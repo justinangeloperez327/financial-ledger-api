@@ -401,6 +401,8 @@ func TestHTTPWorkflow(t *testing.T) {
 	if got := f.balance(t, f.cash.ID); got != "750" {
 		t.Fatal(got)
 	}
+	request("POST", "/accounts/"+f.bank.ID+"/close", "", nil, 409)
+	request("POST", "/transfers", "drain-bank", ledger.Transfer{From: f.bank.ID, To: f.cash.ID, Currency: "AED", Amount: 250, Description: "Drain bank before closure"}, 201)
 	request("POST", "/accounts/"+f.bank.ID+"/close", "", nil, 200)
 	request("POST", "/transfers", "closed", ledger.Transfer{From: f.cash.ID, To: f.bank.ID, Currency: "AED", Amount: 1, Description: "closed"}, 409)
 }

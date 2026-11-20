@@ -14,7 +14,7 @@ erDiagram
   LEDGERS ||--o{ AUDIT_EVENTS : records
 ```
 
-Each account has an immutable type, currency, code, and negative-balance policy. Its only mutable field is `closed`. Every journal is posted in its creation transaction. There is no persisted draft state and no balance column. Journals have server-assigned timestamps; backdating is outside the MVP. Every journal line references a journal and an account through composite ledger/currency foreign keys.
+Each account has an immutable type, currency, code, and negative-balance policy. Its only mutable field is `closed`. Closure requires a zero net balance, checked after acquiring the same account row lock used by postings. PostgreSQL also rejects nonzero-balance closure through a trigger. Every journal is posted in its creation transaction. There is no persisted draft state and no balance column. Journals have server-assigned timestamps; backdating is outside the MVP. Every journal line references a journal and an account through composite ledger/currency foreign keys.
 
 ## Posting transaction
 
@@ -33,7 +33,7 @@ A five-second lock timeout bounds contention. The HTTP context has a ten-second 
 
 - Positive bigint amounts and allowed debit/credit sides.
 - Composite foreign keys enforce ledger and currency boundaries.
-- A deferred constraint trigger requires at least two lines, nonzero equal side totals, and totals within signed 64-bit limits.
+- Deferred constraint triggers on journal creation and line insertion require at least two lines, nonzero equal side totals, and totals within signed 64-bit limits. Later line inserts queue fresh validation even if `SET CONSTRAINTS` already flushed earlier events. The same validator enforces exact reversal and nonnegative policies.
 - Journal and line UPDATE/DELETE are rejected. Lines can only be inserted into journals created in the same transaction, using a full transaction ID (`xid8`). Later append is rejected.
 - Reversals have a unique original reference, match the original currency/ledger, and must exactly invert the original lines at commit.
 - Line insertion locks the account and rejects closed accounts. Deferred validation also checks nonnegative policies.
@@ -42,6 +42,8 @@ A five-second lock timeout bounds contention. The HTTP context has a ten-second 
 Application account locks provide the supported concurrency protocol. Direct bulk import SQL must follow the same ascending account lock order and READ COMMITTED isolation; bypassing the service is not a supported write API. Database owners/superusers can disable triggers or truncate data, so production role separation is required.
 
 ## Money and reports
+
+Names, codes, and descriptions count Unicode code points to match PostgreSQL text length and OpenAPI maxLength. Opaque idempotency keys remain limited to 128 bytes.
 
 All request amounts are decimal strings of integer minor units. Floats, exponent notation, leading plus signs, and leading zeros are rejected. Currency metadata defines precision for display; AED/PHP/USD use two decimal places. There is no FX conversion or multi-currency journal.
 

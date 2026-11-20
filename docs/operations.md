@@ -50,7 +50,7 @@ Review default public schema privileges and organization-wide database policies 
 
 ## Start, migrate, and stop
 
-`docker compose up --build -d` applies embedded migrations in the `migrate` service before API startup. `docker compose logs migrate api` shows failures. Migrations use a session advisory lock to serialize migration commands. Run only reviewed migrations; never roll back a populated ledger as a routine deployment strategy.
+`docker compose up --build -d` applies embedded migrations in the `migrate` service before API startup. `docker compose logs migrate api` shows failures. Migrations use a session advisory lock to serialize migration commands. Migration 3 adds line-level constraint validation and a zero-balance closure guard without changing posted records. Existing databases need this migration before the updated API is put into service. It does not automatically repair previously inconsistent journals or reopen previously closed accounts. Run only reviewed migrations; never roll back a populated ledger as a routine deployment strategy.
 
 A local deployment can run `DATABASE_URL=... go run ./cmd/migrate`, then `go run ./cmd/api`. Send SIGTERM for graceful HTTP shutdown (ten-second deadline). Put TLS and ingress limits in front of the API; do not expose PostgreSQL publicly. This repository does not auto-deploy.
 
